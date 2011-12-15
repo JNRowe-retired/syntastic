@@ -83,6 +83,7 @@ command! Errors call s:ShowLocList()
 
 highlight link SyntasticError SpellBad
 highlight link SyntasticWarning SpellCap
+highlight link SyntasticInfo SpellLocal
 
 augroup syntastic
     if g:syntastic_echo_current_error
@@ -192,12 +193,17 @@ endfunction
 
 "return true if there are cached errors/warnings for this buf
 function! s:BufHasErrorsOrWarnings()
-    return exists("b:syntastic_loclist") && !empty(b:syntastic_loclist)
+    return exists("b:syntastic_loclist") && !empty(s:BufHasErrors() + s:BufHasWarnings())
 endfunction
 
 "return true if there are cached errors for this buf
 function! s:BufHasErrors()
     return len(s:ErrorsForType('E')) > 0
+endfunction
+
+"return true if there are cached warnings for this buf
+function! s:BufHasWarnings()
+    return len(s:ErrorsForType('W')) > 0
 endfunction
 
 function! s:BufHasErrorsOrWarningsToDisplay()
@@ -223,6 +229,7 @@ if g:syntastic_enable_signs
     "use >> to display syntax errors in the sign column
     sign define SyntasticError text=>> texthl=error
     sign define SyntasticWarning text=>> texthl=todo
+    sign define SyntasticInfo text=>> texthl=info
 endif
 
 "start counting sign ids at 5000, start here to hopefully avoid conflicting
@@ -239,9 +246,12 @@ function s:SignErrors()
                 continue
             endif
 
-            let sign_type = 'SyntasticError'
-            if i['type'] == 'W'
+            if i['type'] == 'E'
+                let sign_type = 'SyntasticError'
+            elseif i['type'] == 'W'
                 let sign_type = 'SyntasticWarning'
+            else
+                let sign_type = 'SyntasticInfo'
             endif
 
             exec "sign place ". s:next_sign_id ." line=". i['lnum'] ." name=". sign_type ." file=". expand("%:p")
@@ -480,7 +490,12 @@ function! SyntasticHighlightErrors(errors, termfunc, ...)
 
     let force_callback = a:0 && a:1
     for item in a:errors
-        let group = item['type'] == 'E' ? 'SyntasticError' : 'SyntasticWarning'
+        if item['type'] == 'E'
+            let group = 'SyntasticError'
+        elseif item['type'] == 'W'
+            let group = 'SyntasticWarning'
+        else
+            let group = 'SyntasticInfo'
         if item['col'] && !force_callback
             let lastcol = col([item['lnum'], '$'])
             let lcol = min([lastcol, item['col']])
